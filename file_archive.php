@@ -416,7 +416,7 @@ $_SESSION['Module'] = "Help Desk";
                 <div class="mb-4">
 
                     <label for="fileName" class="form-label">
-                        File Name
+                        Remark File Name
                     </label>
 
                     <input
@@ -517,9 +517,9 @@ $_SESSION['Module'] = "Help Desk";
 
                     <thead>
                         <tr>
-                            <th style="width: 10%;"> File ID </th>
+                            <th style="width: 35%;"> Original File Name </th>
 
-                            <th style="width: 45%;"> File Name </th>
+                            <th style="width: 20%;"> Remark File Name </th>
 
                             <th style="width: 20%;"> Modified Date </th>
 
@@ -559,7 +559,7 @@ $_SESSION['Module'] = "Help Desk";
                 <div class="mb-4">
 
                     <label for="modifyFileName" class="form-label">
-                        Update File Name <span class="text-danger">*</span>
+                        Update Remark File Name <span class="text-danger">*</span>
                     </label>
 
                     <input
@@ -567,7 +567,7 @@ $_SESSION['Module'] = "Help Desk";
                         class="form-control file-name-input"
                         id="modifyFileName"
                         name="modifyFileName"
-                        placeholder="Enter file name"
+                        placeholder="Enter remark file name"
                         required >
 
                 </div>
@@ -620,16 +620,40 @@ $_SESSION['Module'] = "Help Desk";
 
 <script>
 
+    var archiveTable;
+    
+    $(document).ready(function (){
 
-    /*var mockData = [
-        { id: 1, name: 'Project_Document.pdf', modifiedDate: '05 Oct 2026 10:30 AM' },
-        { id: 2, name: 'Meeting_Notes.docx', modifiedDate: '12 Oct 2026 02:15 PM' },
-        { id: 3, name: 'Budget_Report.xlsx', modifiedDate: '20 Oct 2026 09:45 AM' }
-    ];*/
+         archiveTable = $('#archiveTable').DataTable({
+        columns: [
 
-    $(document).ready(function () {
+        { data: 'original_file_name' },
+        { data: 'remark_name', render: function (data, type, row) {
+                return '<span class="file-name">' + data + '</span>';
+            } },
+        { data: 'updated_at' },
+        {data: null,
+            render: function (data, type, row) {
+                return `
+                    <button
+                        class="btn btn-sm btn-modify table-action-btn"
+                        data-id="${row.uuid}">
+                        Modify
+                    </button>
 
+                    <button
+                        class="btn btn-sm btn-delete table-action-btn"
+                        data-id="${row.uuid}">
+                        Delete
+                    </button>
+                `;
+            }
+        }
+    ]
+});
+        console.log('DataTable initialized and ready.');
         loadArchiveFiles();
+        console.log('Archive files loaded and displayed in DataTable.');
 
         /* Open file browser when the drop zone is clicked.*/
         $('#fileDropZone').on('click', function (event) {
@@ -707,47 +731,31 @@ $_SESSION['Module'] = "Help Desk";
         });
 
 
-/* Filling the table with mock data. 
-$.each(mockData, function (index, file) {
-
-    var row = $('<tr>');
-    row.append($('<td>').text(file.id).addClass('file-id'));
-    row.append($('<td>').text(file.name).addClass('file-name'));
-    row.append($('<td>').text(file.modifiedDate));
-    var actionTd = $('<td>');
-    var modifyBtn = $('<button>').addClass('btn btn-sm btn-modify table-action-btn').text('Modify');
-    var deleteBtn = $('<button>').addClass('btn btn-sm btn-delete table-action-btn').text('Delete');
-    actionTd.append(modifyBtn, deleteBtn);
-    row.append(actionTd);
-    $('.archive-table tbody').append(row);
-
-}); */
-
-
     /* Open modify modal.*/
-    $('.archive-table tbody').on('click', '.btn-modify', function () {
-    var row = $(this).closest('tr');
-    var fileName = row.find('.file-name').text().trim();
-    console.log('Modify button clicked for file: ' + fileName);
-    $('#modifyFileName').val(fileName);
-    $('#modifyFileInput').val('');
-    $('#modifySelectedFileName').text('');
-    $('#modifyModal').css('display', 'flex');
+        $('.archive-table tbody').on('click', '.btn-modify', function () {
+            var uuid = $(this).data('id');
+            var row = $(this).closest('tr');
+            var fileName = row.find('.file-name').text().trim();
+            console.log('Modify button clicked for file: ' + fileName);
+            $('#modifyFileName').val(fileName);
+            $('#modifyFileInput').val('');
+            $('#modifySelectedFileName').text('');
+            $('#modifyModal').css('display', 'flex');
 
-    });
+        });
 
-    $('archive-table tbody').on('click', '.btn-delete', function () {
+        $('archive-table tbody').on('click', '.btn-delete', function () {
         var row = $(this).closest('tr');
         var fileName = row.find('.file-name').text().trim();
         console.log('Delete button clicked for file: ' + fileName);
-    });
+        });
 
 
     /* Close modify modal.*/
-    $('#modifyCancelButton').on('click', function () {
-    $('#modifyModal').css('display', 'none');
+        $('#modifyCancelButton').on('click', function () {
+        $('#modifyModal').css('display', 'none');
 
-    });
+        });
 
     /*Modify button.*/
     $('#modifyButton').on('click', function () {
@@ -777,46 +785,38 @@ $.each(mockData, function (index, file) {
     });
 
 
-    });
+});
 
-    /* jquery functions */
+/* jquery functions */
 
-    function loadArchiveFiles() {
-
+function loadArchiveFiles() {
     $.ajax({
         url: 'Sql_file_archive.php',
         type: 'POST',
         data: {
             action: 'get_files'
         },
+
         success: function (response) {
+
             var result = JSON.parse(response);
-        
+
             if (result.status) {
-                $('#archiveTable').DataTable({
-                    data: result.data,
-                    columns: [
-                        {data: 'uuid'},
-                        {data: 'file_name', render: function (data, type, row, meta) {
-                            return `<span class="file-name">${data}</span>`;
-                        }},
-                        {data: 'updated_at'},
-                        {data: null,
-                            render: function () {
-                                return `
-                                    <button class="btn btn-sm btn-modify table-action-btn">
-                                        Modify
-                                    </button>
+                console.log('Is array:', Array.isArray(result.data));
+                console.log('Data constructor:', result.data.constructor.name);
+                console.log('Archive files loading successful. Updating table...');
 
-                                    <button class="btn btn-sm btn-delete table-action-btn">
-                                        Delete
-                                    </button>
-                                `;
-                            }
-                        }
-                    ]
-                });
+                archiveTable.clear();
 
+                console.log('Archive files loading successful. Updating table... clearing');
+
+                archiveTable.rows.add(result.data);
+
+                console.log('Archive files loading successful. Updating table... updating');
+
+                archiveTable.draw();
+
+                console.log('Archive files loading successful. Updating table... draw');
             }
         },
 
@@ -862,7 +862,7 @@ function uploadFile() {
                 $('#selectedFileName').text('');
         
                 loadArchiveFiles();
-
+                alert(result.msg);
             } else {alert(result.msg);}
         },
 
@@ -873,7 +873,6 @@ function uploadFile() {
     });
 }
 
-console.log('File archive script loaded successfully.');
 
 </script>
 
