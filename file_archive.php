@@ -544,42 +544,78 @@ $_SESSION['Module'] = "Help Desk";
 
         <!-- Header -->
         <div class="modify-modal-header">
-
             <h4>Modify File</h4>
-
         </div>
-
 
         <!-- Body -->
         <div class="modify-modal-body">
 
             <form id="modifyFileForm">
 
-                <!-- File Name -->
+                <!-- Original File Name -->
                 <div class="mb-4">
 
-                    <label for="modifyFileName" class="form-label">
-                        Update Remark File Name <span class="text-danger">*</span>
+                    <label
+                        for="modifyOriginalFileName"
+                        class="form-label">
+
+                        Original File Name
+
+                    </label>
+
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="modifyOriginalFileName"
+                        name="modifyOriginalFileName"
+                        readonly>
+
+                </div>
+
+
+                <!-- Remark File Name -->
+                <div class="mb-4">
+
+                    <label
+                        for="modifyRemarkName"
+                        class="form-label">
+
+                        Update Remark File Name
+                        <span class="text-danger">*</span>
+
                     </label>
 
                     <input
                         type="text"
                         class="form-control file-name-input"
-                        id="modifyFileName"
-                        name="modifyFileName"
+                        id="modifyRemarkName"
+                        name="modifyRemarkName"
                         placeholder="Enter remark file name"
-                        required >
+                        required>
 
                 </div>
 
-                <!-- File -->
+                <!-- Replacement File -->
                 <div class="mb-3">
 
-                    <label for="updatefileInput" class="btn btn-outline-primary btn-sm"> Update File </label>
+                    <label
+                        for="updatefileInput"
+                        class="btn btn-outline-primary btn-sm">
 
-                        <input type="file" id="updatefileInput" name="updatefile" class="update-file-input">
+                        Update File
 
-                    <div id="modifySelectedFileName" class="file-selected-name"></div>
+                    </label>
+
+                    <input
+                        type="file"
+                        id="updatefileInput"
+                        name="updatefile"
+                        class="update-file-input">
+
+                    <div
+                        id="modifySelectedFileName"
+                        class="file-selected-name">
+                    </div>
 
                 </div>
 
@@ -594,17 +630,20 @@ $_SESSION['Module'] = "Help Desk";
             <button
                 type="button"
                 class="btn-clear"
-                id="modifyCancelButton"
-            >
+                id="modifyCancelButton">
+
                 Cancel
+
             </button>
+
 
             <button
                 type="button"
                 class="btn-upload"
-                id="modifyButton"
-            >
+                id="modifyButton">
+
                 Modify
+
             </button>
 
         </div>
@@ -621,13 +660,14 @@ $_SESSION['Module'] = "Help Desk";
 <script>
 
     var archiveTable;
+    var modifyUuid = null;
     
     $(document).ready(function (){
 
          archiveTable = $('#archiveTable').DataTable({
         columns: [
 
-        { data: 'original_file_name' },
+        { data: 'original_file_name'},
         { data: 'remark_name', render: function (data, type, row) {
                 return '<span class="file-name">' + data + '</span>';
             } },
@@ -732,17 +772,54 @@ $_SESSION['Module'] = "Help Desk";
 
 
     /* Open modify modal.*/
-        $('.archive-table tbody').on('click', '.btn-modify', function () {
-            var uuid = $(this).data('id');
-            var row = $(this).closest('tr');
-            var fileName = row.find('.file-name').text().trim();
-            console.log('Modify button clicked for file: ' + fileName);
-            $('#modifyFileName').val(fileName);
-            $('#modifyFileInput').val('');
-            $('#modifySelectedFileName').text('');
-            $('#modifyModal').css('display', 'flex');
+        $('.archive-table tbody').on('click','.btn-modify', function () {
 
+        modifyUuid = $(this).data('id');
+        console.log('Modify UUID:', modifyUuid);
+
+        $.ajax({
+            url: 'Sql_file_archive.php',
+            type: 'POST',
+            data: {
+                action: 'get_file',
+                uuid: modifyUuid
+            },
+            success: function (response) {
+                console.log('GET FILE RESPONSE:', response);
+                var result = JSON.parse(response);
+                if (result.status) {
+
+                var file = result.data;
+                modifyUuid = file.uuid;
+                originalRemarkName = file.remark_name;
+                $('#modifyOriginalFileName').val(file.original_file_name);
+                $('#modifyRemarkName').val(file.remark_name);
+                $('#updatefileInput').val('');
+                $('#modifySelectedFileName').text('No replacement file selected.');
+                $('#modifyModal').show();}
+            },
+
+
+            error: function (xhr, status, error) {
+                console.log('GET FILE ERROR');
+                console.log('Status:',status);
+                console.log('Error:', error);
+                console.log('Response:',xhr.responseText);
+                alert('Unable to load file information.');
+            }
         });
+    }
+);
+
+/*modify update file name in modal */
+         $('#updatefileInput').on('change',function () {
+             if (this.files.length > 0) {
+        $('#modifySelectedFileName').text(this.files[0].name);
+        } else {
+            $('#modifySelectedFileName').text('No replacement file selected.');
+        }
+        }
+    );
 
         $('archive-table tbody').on('click', '.btn-delete', function () {
         var row = $(this).closest('tr');
@@ -760,12 +837,54 @@ $_SESSION['Module'] = "Help Desk";
     /*Modify button.*/
     $('#modifyButton').on('click', function () {
 
-    if ($('#modifyFileForm')[0].checkValidity()) {
-        $('#modifyModal').css('display', 'none');
-    } 
-    else {
-        $('#modifyFileForm')[0].reportValidity();
-    }
+        var newRemarkName = $('#modifyRemarkName').val().trim();
+        var fileInput = $('#updatefileInput')[0];
+
+        /* Validate remark.*/
+        if (newRemarkName === '') {
+            alert('Remark name cannot be empty.');
+            return;
+        }
+
+        /*
+         * Determine whether
+         * anything changed.
+         */
+
+        var remarkChanged =newRemarkName !== originalRemarkName;
+        var fileChanged = fileInput.files.length > 0;
+        if (!remarkChanged && !fileChanged) {
+            alert('No changes were made.');
+            return;
+        }
+
+        /*
+         * Confirmation message.
+         */
+        var message ='Are you sure you want to modify this file?\n\n';
+
+        if (remarkChanged) {
+            message +='• Remark name will be updated.\n';}
+        if (fileChanged) {
+            message +='• The existing file will be replaced.\n';
+            message +='• The previous physical file will be deleted.\n';
+        }
+        message +='\nThis action will modify the stored record.';
+        message +='\n\nDo you want to continue?';
+
+        /*
+         * Browser confirmation.
+         */
+
+        var confirmed = confirm(message);
+
+        if (!confirmed) {
+            console.log('Modify operation cancelled.');
+            return;
+        }
+
+        /*User confirmed.*/
+        modifyFile();
 
     });
 
@@ -787,36 +906,77 @@ $_SESSION['Module'] = "Help Desk";
 
 });
 
+
+
+function modifyFile(){
+    var remarkName = $('#modifyRemarkName').val().trim();
+    var fileInput = $('#updatefileInput')[0];
+    var formData = new FormData();
+    
+    console.log('Preparing to modify file with UUID:', modifyUuid);
+    formData.append('action','modify_file');
+    formData.append('remarkName',remarkName);
+    formData.append('uuid', modifyUuid);
+
+    /* Only append file if user selected one. */
+
+    if (fileInput.files.length > 0) {
+        formData.append('file',fileInput.files[0]);
+    }
+    
+    $.ajax({
+
+        url: 'Sql_file_archive.php',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+
+        success: function (response) {
+            console.log('MODIFY RESPONSE:',response);
+
+            var result = JSON.parse(response);
+
+            if (result.status) {
+                alert(result.msg);
+                $('#modifyModal').hide();
+                $('#modifyFileForm')[0].reset();
+                $('#modifySelectedFileName').text('No replacement file selected.');
+
+                /* Refresh DataTable.*/
+                loadArchiveFiles();
+
+            } else {alert(result.msg);}
+        },
+
+        error: function (xhr,status, error) {
+
+            console.log('MODIFY AJAX ERROR');
+            console.log('Status:',status);
+            console.log('Error:',error);
+            console.log('Response:',xhr.responseText);
+
+            alert('Unable to modify the file.');
+        }
+    });
+}
+
 /* jquery functions */
 
 function loadArchiveFiles() {
     $.ajax({
         url: 'Sql_file_archive.php',
         type: 'POST',
-        data: {
-            action: 'get_files'
-        },
+        data: {action: 'get_files'},
 
         success: function (response) {
 
             var result = JSON.parse(response);
 
             if (result.status) {
-                console.log('Is array:', Array.isArray(result.data));
-                console.log('Data constructor:', result.data.constructor.name);
-                console.log('Archive files loading successful. Updating table...');
-
                 archiveTable.clear();
-
-                console.log('Archive files loading successful. Updating table... clearing');
-
                 archiveTable.rows.add(result.data);
-
-                console.log('Archive files loading successful. Updating table... updating');
-
                 archiveTable.draw();
-
-                console.log('Archive files loading successful. Updating table... draw');
             }
         },
 
