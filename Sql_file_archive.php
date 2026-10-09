@@ -49,30 +49,13 @@ if (isset($_POST['action'])) {
 
 function validateUploadedFile($file)
 {
-    if (!isset($_POST['fileName']) || !isset($_FILES['file'])) {
-
-        echo json_encode([
+    if (!isset($file) || !is_array($file)) {
+        return [
             'status' => false,
-            'msg' => 'File name and file are required.'
-        ]);
-
-        exit;
+            'msg' => 'No file was uploaded.'
+        ];
     }
 
-    $file = $_FILES['file'];
-    $remarkName = trim($_POST['fileName']);
-    $originalFileName = $file['name'];
-    
-
-    if ($remarkName  == '') {
-
-        echo json_encode([
-            'status' => false,
-            'msg' => 'File name cannot be empty.'
-        ]);
-
-        exit;
-    }
 
     if ($file['error'] !== UPLOAD_ERR_OK) {
 
@@ -98,9 +81,7 @@ function validateUploadedFile($file)
     }
 
     // Get file extension
-    $extension = strtolower(
-        pathinfo($file['name'], PATHINFO_EXTENSION)
-    );
+    $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
     // Allowed extensions
     $allowedExtensions = [
@@ -122,7 +103,6 @@ function validateUploadedFile($file)
             'status' => false,
             'msg' => 'This file type is not allowed.'
         ]);
-
         exit;
     }
 
@@ -264,10 +244,7 @@ function uploadFiles()
     $databaseFilePath ='uploads/file_archive/' . $storedFileName;
 
     /* Move uploaded file.*/
-    if (!move_uploaded_file(
-        $file['tmp_name'],
-        $filePath)) {
-
+    if (!move_uploaded_file($file['tmp_name'], $filePath)) {
         echo json_encode(['status' => false, 'msg' => 'Unable to save uploaded file.']);
         exit;
     }
@@ -310,14 +287,11 @@ function uploadFiles()
             unlink($filePath);
         }
 
-
         echo json_encode(['status' => false, 'msg' => 'Unable to save file information.']);
         exit;
     }
 
-
     echo json_encode(['status' => true, 'msg' => 'File uploaded successfully.']);
-
     exit;
 }
 
@@ -327,7 +301,6 @@ function getFileforModal()
     global $conn;
 
     if (!isset($_POST['uuid'])) {
-
         echo json_encode(['status' => false,'msg' => 'File UUID is required.']);
         exit;
     }
@@ -357,7 +330,6 @@ function getFileforModal()
     }
 
     $file = $result->fetch_assoc();
-
     echo json_encode(['status' => true, 'data' => $file]);
     exit;
 }
@@ -375,12 +347,10 @@ function modifyFile()
         echo json_encode(['status' => false, 'msg' => 'File UUID is required.']);
         exit;
     }
-
     if (!isset($_POST['remarkName'])) {
         echo json_encode(['status' => false, 'msg' => 'Remark name is required.']);
         exit;
     }
-
     $uuid = $_POST['uuid'];
     $remarkName = trim($_POST['remarkName']);
 
@@ -388,11 +358,7 @@ function modifyFile()
         echo json_encode(['status' => false, 'msg' => 'Remark name cannot be empty.']);
         exit;
     }
-    /*
-     * -------------------------
-     * 2. Get existing record
-     * -------------------------
-     */
+    /*2. Get existing record */
     $sql = "SELECT
                 uuid,
                 original_file_name,
@@ -405,32 +371,23 @@ function modifyFile()
             WHERE uuid = ?
             AND is_active = 1";
 
-
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('s', $uuid);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
-
         echo json_encode([ 'status' => false,'msg' => 'File not found while the modifying.']);
         exit;
     }
 
     $existingFile = $result->fetch_assoc();
 
-    /*
-     * -------------------------
-     * 3. Check for new file
-     * -------------------------
-     */
+    /* 3. Check for new file */
 
     $hasNewFile = isset($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_NO_FILE;
-    /*
-     * -------------------------
-     * 4. Remark-only update
-     * -------------------------
-     */
+
+    /* 4. Remark-only update */
 
     if (!$hasNewFile) {
 
@@ -449,10 +406,10 @@ function modifyFile()
             echo json_encode(['status' => false, 'msg' => 'Unable to update remark name.']);
             exit;
         }
-
         echo json_encode(['status' => true, 'msg' => 'File information updated successfully.']);
         exit;
     }
+
     /*5. New file exists */
 
     $newFile = $_FILES['file'];
@@ -462,7 +419,6 @@ function modifyFile()
     $validation =validateUploadedFile($newFile);
 
     if (!$validation['status']) {
-
         echo json_encode( $validation);
         exit;
     }
@@ -497,7 +453,6 @@ function modifyFile()
     /* 7. Save new filetemporarily */
 
     if (!move_uploaded_file( $newFile['tmp_name'], $temporaryFilePath)) {
-
         echo json_encode(['status' => false, 'msg' => 'Unable to save replacement file.']);
         exit;
     }
@@ -515,11 +470,9 @@ function modifyFile()
          */
 
         if (file_exists($temporaryFilePath)) {unlink($temporaryFilePath);}
-
         echo json_encode(['status' => false, 'msg' => 'Unable to prepare the existing file for replacement.']);
         exit;
     }
-
 
     /*
      * -------------------------
@@ -540,17 +493,12 @@ function modifyFile()
         if (file_exists($oldBackupPath)) {
             rename($oldBackupPath, $oldFilePath);
         }
-
-
         if (file_exists($temporaryFilePath)) {
             unlink($temporaryFilePath);
         }
-
-
         echo json_encode(['status' => false, 'msg' => 'Unable to prepare the replacement file.']);
         exit;
     }
-
 
     /*
      * -------------------------
@@ -615,8 +563,100 @@ function modifyFile()
      */
 
     if (file_exists($oldBackupPath)) {unlink($oldBackupPath);}
-
     echo json_encode(['status' => true,'msg' => 'File modified successfully.']);
+    exit;
+}
+
+/* Delete File function */
+
+function deleteFile()
+{
+    global $conn;
+
+    /*Validate UUID.*/
+
+    if (!isset($_POST['uuid'])) {
+        echo json_encode(['status' => false,'msg' => 'File UUID is required.']);
+        exit;
+    }
+
+    $uuid = $_POST['uuid'];
+
+    /*Get physical file path. */
+
+    $sql = "SELECT
+                file_path
+            FROM file_archive
+            WHERE uuid = ?
+            AND is_active = 1";
+
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param(
+        's',
+        $uuid
+    );
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+
+        echo json_encode(['status' => false,'msg' => 'File not found.']);
+        exit;
+    }
+
+    $file = $result->fetch_assoc();
+    $physicalPath = __DIR__ . '/' .$file['file_path'];
+
+    /* Update database first.*/
+
+    $sql = "UPDATE file_archive
+            SET is_active = 0
+            WHERE uuid = ?";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param(
+        's',
+        $uuid
+    );
+
+    if (!$stmt->execute()) {
+
+        echo json_encode(['status' => false,'msg' => 'Unable to delete file record.']);
+        exit;
+    }
+
+    /*
+     * Database is now inactive.
+     *
+     * Delete physical file.
+     */
+
+    if (file_exists($physicalPath) && !unlink($physicalPath)) {
+
+        /*
+         * Important:
+         *
+         * DB is already inactive,
+         * but physical file could not
+         * be removed.
+         */
+
+        echo json_encode([
+            'status' => false,
+            'msg' => 'Record was deleted, but the physical file could not be removed.'
+        ]);
+
+        exit;
+    }
+
+
+    echo json_encode([
+        'status' => true,
+        'msg' => 'File deleted successfully.'
+    ]);
+
     exit;
 }
 
