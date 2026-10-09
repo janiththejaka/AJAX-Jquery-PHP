@@ -796,9 +796,8 @@ $_SESSION['Module'] = "Help Desk";
                 $('#modifyRemarkName').val(file.remark_name);
                 $('#updatefileInput').val('');
                 $('#modifySelectedFileName').text('No replacement file selected.');
-                $('#modifyModal').show();}
+                $('#modifyModal').css('display', 'flex');}
             },
-
 
             error: function (xhr, status, error) {
                 console.log('GET FILE ERROR');
@@ -818,8 +817,7 @@ $_SESSION['Module'] = "Help Desk";
         } else {
             $('#modifySelectedFileName').text('No replacement file selected.');
         }
-        }
-    );
+        });
 
         $('archive-table tbody').on('click', '.btn-delete', function () {
         var row = $(this).closest('tr');
@@ -831,7 +829,6 @@ $_SESSION['Module'] = "Help Desk";
     /* Close modify modal.*/
         $('#modifyCancelButton').on('click', function () {
         $('#modifyModal').css('display', 'none');
-
         });
 
     /*Modify button.*/
@@ -846,10 +843,7 @@ $_SESSION['Module'] = "Help Desk";
             return;
         }
 
-        /*
-         * Determine whether
-         * anything changed.
-         */
+        /* Determine whetheranything changed. */
 
         var remarkChanged =newRemarkName !== originalRemarkName;
         var fileChanged = fileInput.files.length > 0;
@@ -858,9 +852,7 @@ $_SESSION['Module'] = "Help Desk";
             return;
         }
 
-        /*
-         * Confirmation message.
-         */
+        /*Confirmation message. */
         var message ='Are you sure you want to modify this file?\n\n';
 
         if (remarkChanged) {
@@ -872,12 +864,9 @@ $_SESSION['Module'] = "Help Desk";
         message +='\nThis action will modify the stored record.';
         message +='\n\nDo you want to continue?';
 
-        /*
-         * Browser confirmation.
-         */
+        /* Browser confirmation.*/
 
         var confirmed = confirm(message);
-
         if (!confirmed) {
             console.log('Modify operation cancelled.');
             return;
@@ -887,6 +876,28 @@ $_SESSION['Module'] = "Help Desk";
         modifyFile();
 
     });
+
+    /* Delete Button Function*/
+    $('.archive-table tbody').on('click','.btn-delete',function () {
+
+        var uuid =$(this).data('id');
+        var confirmed =
+            confirm(
+                'WARNING!\n\n' +
+                'Are you sure you want to delete this file?\n\n' +
+                'The stored physical file will be deleted ' +
+                'and the record will be removed from the active archive.\n\n' +
+                'This action cannot be undone.\n\n' +
+                'Do you want to continue?'
+            );
+
+        if (!confirmed) {console.log('Delete operation cancelled.');
+            return;
+        }
+        deleteFile(uuid);
+    }
+    );
+
 
     /*Display selected file.*/
     $('#updatefileInput').on('change', function () {
@@ -957,6 +968,35 @@ function modifyFile(){
             console.log('Response:',xhr.responseText);
 
             alert('Unable to modify the file.');
+        }
+    });
+}
+
+/* Delete row function */
+function deleteFile(uuid){
+    $.ajax({
+        url: 'Sql_file_archive.php',
+        type: 'POST',
+        data: {action: 'delete_file',uuid: uuid},
+        success: function (response) {
+            console.log('DELETE RESPONSE:',response);
+
+            var result = JSON.parse(response);
+
+            if (result.status) {
+                alert(result.msg);
+                loadArchiveFiles();
+            } else {
+                alert(result.msg);
+            }
+        },
+        error: function (xhr,status,error) {
+
+            console.log('DELETE AJAX ERROR');
+            console.log('Status:',status);
+            console.log('Error:',error);
+            console.log('Response:',xhr.responseText);
+            alert('Unable to delete the file.');
         }
     });
 }
